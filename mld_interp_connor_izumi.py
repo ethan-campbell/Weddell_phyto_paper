@@ -5,8 +5,10 @@ import scipy.interpolate as spin
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
-# read netCDF
-data = xr.open_mfdataset('/Users/Ethan/Desktop/*.nc',concat_dim='time')
+### read netCDF of MLD data
+data = xr.open_mfdataset('/Users/Ethan/Documents/Research/Git/Miscellaneous/connor_izumi_data/'
+                         'connor_izumi_jamstec_argo_ml_*.nc',
+                         concat_dim='time')
 lons = data['LONGITUDE'].values
 lons[lons < 0] += 360
 data['LONGITUDE'] = lons
@@ -44,22 +46,43 @@ for t in range(len(mld['time'])):
     mld[t] = z_2D
 
 # read Excel sheet
-cruise_data = pd.read_excel('/Users/Ethan/Desktop/connor_izumi_cruise_track.xlsx',header=4)
+cruise_data = pd.read_excel('/Users/Ethan/Documents/Research/Git/Miscellaneous/connor_izumi_cruise_track.xlsx'
+                            ,header=4)
 cruise_data = cruise_data.iloc[range(0,len(cruise_data)+1,2),:]
 
 # calculate MLDs
 for i in range(len(cruise_data)):
-    if np.isnan(cruise_data['Mixed Layer Depth (m)'].iloc[i]):
-        dt = cruise_data['Date_Time'].iloc[i]
-        lon = cruise_data['Longitude (º W)'].iloc[i]
-        if lon < 0:
-            lon += 360
-        lat = cruise_data['Latitude (º N)'].iloc[i]
-        mld_lookup = float(mld.sel(time=dt,LONGITUDE=lon,LATITUDE=lat,method='nearest'))
-        cruise_data['Mixed Layer Depth (m)'].iloc[i] = mld_lookup
+    # if np.isnan(cruise_data['Mixed Layer Depth (m)'].iloc[i]):
+    dt = cruise_data['Date_Time'].iloc[i]
+    lon = cruise_data['Longitude (º W)'].iloc[i]
+    if lon < 0:
+        lon += 360
+    lat = cruise_data['Latitude (º N)'].iloc[i]
+    mld_lookup = float(mld.sel(time=dt,LONGITUDE=lon,LATITUDE=lat,method='nearest'))
+    cruise_data['Mixed Layer Depth (m)'].iloc[i] = mld_lookup
 
-plt.plot(cruise_data['Mixed Layer Depth (m)'])
-plt.show()
+
+
+### interpolate wind data
+data = xr.open_mfdataset('/Users/Ethan/Documents/Research/Git/Miscellaneous/connor_izumi_data/'
+                         'CCMP_Wind_Analysis_*_V02.0_L3.0_RSS.nc',
+                         concat_dim='time')
+uwnd = data['uwnd']
+vwnd = data['vwnd']
+wind = (uwnd ** 2 + vwnd ** 2) ** 0.5
+
+cruise_data['Wind Speed CCMP'] = cruise_data['Wind Speed (m/s)']
+
+# calculate MLDs
+for i in range(len(cruise_data)):
+    # if np.isnan(cruise_data['Mixed Layer Depth (m)'].iloc[i]):
+    dt = cruise_data['Date_Time'].iloc[i] - timedelta(days=60)
+    lon = cruise_data['Longitude (º W)'].iloc[i]
+    if lon < 0:
+        lon += 360
+    lat = cruise_data['Latitude (º N)'].iloc[i]
+    windspeed_lookup = float(wind.sel(time=dt,longitude=lon,latitude=lat,method='nearest'))
+    cruise_data['Wind Speed CCMP'].iloc[i] = windspeed_lookup
 
 # export to Excel
 cruise_data.to_excel('/Users/Ethan/Desktop/connor_izumi_cruise_track_updated.xlsx')
