@@ -48,12 +48,12 @@ plt.title('Lomb-Scargle method')
 
 # Welch's method
 welch_freq,Pxx_den = signal.welch(y,24,nperseg=256 * 4,detrend='linear',average='median',scaling='density')
-plt.semilogy(welch_freq,Pxx_den,'k',label='Hourly')
-welch_freq,Pxx_den = signal.welch(y[::6],4,nperseg=256,detrend='linear',average='median',scaling='density')
-plt.semilogy(welch_freq,Pxx_den,'b',label='6-hourly subsampled')
+welch_freq_6hr,Pxx_den_6hr = signal.welch(y[::6],4,nperseg=256,detrend='linear',average='median',scaling='density')
 
 # plot
 plt.subplot(2,1,2)
+plt.semilogy(welch_freq,Pxx_den,'k',label='Hourly')
+plt.semilogy(welch_freq_6hr,Pxx_den_6hr,'b',label='6-hourly subsampled')
 plt.xlim([0.1,2.25])
 old_ylim = plt.ylim()
 plt.plot([f,f],old_ylim,'k--',label=r'$f$')
