@@ -50,8 +50,8 @@ plt.ylabel(r'Power (°C$^2$/cpd)')
 plt.title('Lomb-Scargle method')
 
 # Welch's method
-welch_freq,Pxx_den = signal.welch(y,24,nperseg=256 * 4,detrend='linear',average='median',scaling='density')
-welch_freq_6hr,Pxx_den_6hr = signal.welch(y[::6],4,nperseg=256,detrend='linear',average='median',scaling='density')
+welch_freq,Pxx_den = signal.welch(y,24,nperseg=256*4,detrend='linear',average='median',scaling='density')
+welch_freq_6hr,Pxx_den_6hr = signal.welch(y[::6],24/6,nperseg=256,detrend='linear',average='median',scaling='density')
 
 # plot
 plt.subplot(2,1,2)
@@ -68,20 +68,57 @@ plt.ylabel(r'Power (°C$^2$/cpd)')
 plt.title('Welch\'s method')
 plt.tight_layout()
 
-plt.savefig(output_dir + '5904471_park_depth_temp_psd.pdf')
+plt.savefig(output_dir + '5904471_APEX_park_depth_temp_psd.pdf')
 
 
 ######### load Navis data #########
 
-# pd.read_excel()
-#
-# t = ((pd.to_datetime(matt_data['Date']) - pd.to_datetime(matt_data['Date'])[0]).values.astype('timedelta64[m]')
-#      / timedelta64(1,'m')) / (24 * 60)
-# y = matt_data['Temp'].values
-#
-# t = t[~isnan(y)]
-# y = y[~isnan(y)]
-#
-# freq = linspace(0.1,2.25,10000)
-# pgram = signal.lombscargle(t,y,freq)
-# plt.semilogy(freq,signal.medfilt(pgram,kernel_size=101),'k',label='Hourly')
+ken_data = pd.read_excel(data_dir + '5904673 (0571) - from Ken Johnson.xlsx')
+
+t = ((pd.to_datetime(ken_data['Date']) - pd.to_datetime(ken_data['Date'])[0]).values.astype('timedelta64[m]')
+     / timedelta64(1,'m')) / (24 * 60)
+y = ken_data['Temp'].values
+
+t = t[~isnan(y)]
+y = y[~isnan(y)]
+
+######### analyze Navis data #########
+
+f = 60 * 60 * 24 * (2 * 7.2921e-5 * sin(2 * pi * 60 / 360) / (2 * pi))  # f at 60°
+
+# Lomb-Scargle method
+ls_freq = linspace(0.01,3.0,10000)
+Pxx_den = LombScargle(t,y,normalization='psd').power(ls_freq)
+
+# plot
+plt.figure(figsize=(6,8))
+plt.subplot(2,1,1)
+plt.semilogy(ls_freq,signal.medfilt(Pxx_den,kernel_size=501),'b',label='6-hourly')
+plt.xlim([0.1,2.5])
+plt.ylim([1e-5,8e-3])
+old_ylim = plt.ylim()
+plt.plot([f,f],old_ylim,'k--',label=r'$f$ at 60°S')
+plt.ylim(old_ylim)
+plt.legend(frameon=False)
+plt.xlabel('Frequency (cpd)')
+plt.ylabel(r'Power (°C$^2$/cpd)')
+plt.title('Lomb-Scargle method')
+
+# Welch's method
+welch_freq,Pxx_den = signal.welch(y,24/6,nperseg=256/4,detrend='linear',average='median',scaling='density')
+
+# plot
+plt.subplot(2,1,2)
+plt.semilogy(welch_freq,Pxx_den,'b',label='6-hourly')
+plt.xlim([0.1,2.5])
+plt.ylim([1e-5,8e-3])
+old_ylim = plt.ylim()
+plt.plot([f,f],old_ylim,'k--',label=r'$f$ at 60°S')
+plt.ylim(old_ylim)
+plt.legend(frameon=False)
+plt.xlabel('Frequency (cpd)')
+plt.ylabel(r'Power (°C$^2$/cpd)')
+plt.title('Welch\'s method')
+plt.tight_layout()
+
+plt.savefig(output_dir + '5904673_Navis_park_depth_temp_psd.pdf')
