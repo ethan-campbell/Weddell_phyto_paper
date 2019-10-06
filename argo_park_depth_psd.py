@@ -25,6 +25,21 @@ drift_temp = pd.Series(index=drift_data['datetime'],data=drift_data['temp'])
 t = (drift_temp.index - drift_temp.index[0]).astype('timedelta64[m]') / (24 * 60)  # units: days
 y = drift_temp.values.copy()
 
+######### interpolate over gaps in APEX data #########
+
+interp_start_indices = where(diff(t) > 1.25/24)[0]
+t_interp_start = t[interp_start_indices] + 1/24
+t_interp_end = t[interp_start_indices + 1] - 0.5/24
+drift_temp_padded = pd.Series(index=t,data=(y-mean(y)))   # units: days; NOTE: series is now de-meaned
+for gap_idx in range(len(interp_start_indices)):
+    gap_times = arange(t_interp_start[gap_idx],t_interp_end[gap_idx],1/24)
+    gap_values = zeros(len(gap_times))
+    gap_series = pd.Series(index=gap_times,data=gap_values)
+    drift_temp_padded = pd.concat([drift_temp_padded,gap_series])
+drift_temp_padded.sort_index(inplace=True)
+t = drift_temp_padded.index
+y = drift_temp_padded.values.copy()
+
 ######### analyze APEX data #########
 
 f = 60 * 60 * 24 * (2 * 7.2921e-5 * sin(2 * pi * 65 / 360) / (2 * pi))  # f at 65°
@@ -32,14 +47,14 @@ f = 60 * 60 * 24 * (2 * 7.2921e-5 * sin(2 * pi * 65 / 360) / (2 * pi))  # f at 6
 # Lomb-Scargle method
 ls_freq = linspace(0.01,12.0,10000)
 Pxx_den = LombScargle(t,y,normalization='psd').power(ls_freq)
-ls_freq_6hr = linspace(0.01,2.5,10000)
+ls_freq_6hr = linspace(0.01,2.0,10000)
 Pxx_den_6hr = LombScargle(t[::6],y[::6],normalization='psd').power(ls_freq_6hr)
 
 # plot
 plt.figure(figsize=(6,8))
 plt.subplot(2,1,1)
 plt.semilogy(ls_freq,signal.medfilt(Pxx_den,kernel_size=251),'k',label='Hourly')
-plt.semilogy(ls_freq_6hr,signal.medfilt(Pxx_den_6hr,kernel_size=251),'b',label='6-hourly subsampled')
+plt.semilogy(ls_freq_6hr,signal.medfilt(Pxx_den_6hr,kernel_size=501),'b',label='6-hourly subsampled')
 plt.xlim([0.1,2.5])
 plt.ylim([5e-7,8e-3])
 old_ylim = plt.ylim()
@@ -54,7 +69,7 @@ plt.title('5904471 (APEX) - Lomb-Scargle method')
 welch_freq,Pxx_den \
     = signal.welch(y,24,nperseg=256,window='hanning',detrend='linear',average='median',scaling='density')
 welch_freq_6hr,Pxx_den_6hr \
-    = signal.welch(y[::6],24/6,nperseg=256/4,window='hanning',detrend='linear',average='median',scaling='density')
+    = signal.welch(y[::6],24/6,nperseg=256/6,window='hanning',detrend='linear',average='median',scaling='density')
 
 # plot
 plt.subplot(2,1,2)
@@ -71,7 +86,7 @@ plt.ylabel(r'Power (°C$^2$/cpd)')
 plt.title('5904471 (APEX) - Welch\'s method')
 plt.tight_layout()
 
-plt.savefig(output_dir + '5904471_APEX_park_depth_temp_psd.pdf')
+plt.savefig(output_dir + '5904471_APEX_park_depth_temp_psd_v3.pdf')
 
 
 ######### load Navis data #########
@@ -84,6 +99,21 @@ y = ken_data['Temp'].values
 
 t = t[~isnan(y)]
 y = y[~isnan(y)]
+
+######### interpolate over gaps in Navis data #########
+
+interp_start_indices = where(diff(t) > 6.5/24)[0]
+t_interp_start = t[interp_start_indices] + 6/24
+t_interp_end = t[interp_start_indices + 1] - 3/24
+drift_temp_padded = pd.Series(index=t,data=(y-mean(y)))   # units: days; NOTE: series is now de-meaned
+for gap_idx in range(len(interp_start_indices)):
+    gap_times = arange(t_interp_start[gap_idx],t_interp_end[gap_idx],6/24)
+    gap_values = zeros(len(gap_times))
+    gap_series = pd.Series(index=gap_times,data=gap_values)
+    drift_temp_padded = pd.concat([drift_temp_padded,gap_series])
+drift_temp_padded.sort_index(inplace=True)
+t = drift_temp_padded.index
+y = drift_temp_padded.values.copy()
 
 ######### analyze Navis data #########
 
@@ -108,7 +138,7 @@ plt.ylabel(r'Power (°C$^2$/cpd)')
 plt.title('5904673 (Navis) - Lomb-Scargle method')
 
 # Welch's method
-welch_freq,Pxx_den = signal.welch(y,24/6,nperseg=256/4,detrend='linear',average='median',scaling='density')
+welch_freq,Pxx_den = signal.welch(y,24/6,nperseg=256/6,detrend='linear',average='median',scaling='density')
 
 # plot
 plt.subplot(2,1,2)
@@ -124,7 +154,7 @@ plt.ylabel(r'Power (°C$^2$/cpd)')
 plt.title('5904673 (Navis) - Welch\'s method')
 plt.tight_layout()
 
-plt.savefig(output_dir + '5904673_Navis_park_depth_temp_psd.pdf')
+plt.savefig(output_dir + '5904673_Navis_park_depth_temp_psd_v3.pdf')
 
 
 ######### tests #########
@@ -182,4 +212,4 @@ if run_tests:
     print(trapz(ls_Pxx_den,ls_freq))
     print(trapz(welch_Pxx_den,welch_freq))
     print(trapz(four_Pxx_den,four_freq))
-    print(std(10*random.randn(len(t)))**2)
+    print(std(y_rand)**2)
